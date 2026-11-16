@@ -125,19 +125,46 @@ class _HomePageState extends State<HomePage>
 
   bool get hasFile => _files.isNotEmpty && _activeIndex >= 0;
 
+  /// 支持的扩展名（同时用于 Android 上自过滤）。
+  static const _supportedExtensions = [
+    'txt', 'md', 'markdown', 'diff', 'patch', 'log', 'json', 'yaml', 'yml',
+    'xml', 'svg', 'html', 'htm', 'css', 'scss', 'js', 'ts', 'py', 'java',
+    'kt', 'swift', 'go', 'rs', 'c', 'h', 'cpp', 'cs', 'dart', 'rb', 'php',
+    'sh', 'bash', 'ps1', 'sql', 'ini', 'cfg', 'conf', 'toml', 'csv', 'tsv',
+    'lua', 'pl', 'r', 'dockerfile',
+  ];
+
   Future<void> _openFilePicker() async {
+    // Android 的 ACTION_OPEN_DOCUMENT 在部分 ROM 上显示为内嵌文档页，
+    // 用 FileType.any 调起标准文件选择器，选中后自行按扩展名过滤。
+    final isAndroid = !kIsWeb && Platform.isAndroid;
     final files = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const [
-        'txt', 'md', 'markdown', 'diff', 'patch', 'log', 'json', 'yaml', 'yml',
-        'xml', 'svg', 'html', 'htm', 'css', 'scss', 'js', 'ts', 'py', 'java',
-        'kt', 'swift', 'go', 'rs', 'c', 'h', 'cpp', 'cs', 'dart', 'rb', 'php',
-        'sh', 'bash', 'ps1', 'sql', 'ini', 'cfg', 'conf', 'toml', 'csv', 'tsv',
-        'lua', 'pl', 'r', 'dockerfile',
-      ],
+      dialogTitle: LanguageService.instance.s['app.selectFile'],
+      type: isAndroid ? FileType.any : FileType.custom,
+      allowedExtensions: isAndroid ? null : _supportedExtensions,
     );
     for (final f in files) {
-      await _loadPickedFile(f.name, f.path, f);
+      final ext = f.name.contains('.')
+          ? f.name.split('.').last.toLowerCase()
+          : '';
+      final nameNoPath = f.name.replaceAll('\\', '/').split('/').last;
+      // Android（FileType.any）下过滤不支持的格式
+      if (isAndroid &&
+          ext.isNotEmpty &&
+          !_supportedExtensions.contains(ext) &&
+          FileKind.fromFileName(nameNoPath) == FileKind.plaintext) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${LanguageService.instance.s['app.unsupported']}: ${f.name}',
+              ),
+            ),
+          );
+        }
+        continue;
+      }
+      await _loadPickedFile(nameNoPath, f.path, f);
     }
   }
 
