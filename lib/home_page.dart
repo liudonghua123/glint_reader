@@ -8,8 +8,10 @@ import 'package:file_picker/file_picker.dart';
 
 import 'models.dart';
 import 'i18n.dart';
+import 'recent_files.dart';
 import 'settings.dart';
 import 'settings_page.dart';
+import 'status_bar.dart';
 import 'viewer_page.dart';
 
 /// 主页：文件打开 / 标签式查看。
@@ -116,6 +118,8 @@ class _HomePageState extends State<HomePage>
       ));
       _activeIndex = _files.length - 1;
     });
+    // 记录到最近打开（web 下 path 为文件名，去重以 path 为准）
+    RecentFilesService.instance.record(path ?? name, name);
   }
 
   bool get hasFile => _files.isNotEmpty && _activeIndex >= 0;
@@ -164,6 +168,25 @@ class _HomePageState extends State<HomePage>
     _openContent(name, content, path: path);
   }
 
+  /// 打开最近记录中的文件（仅本地路径可重开）。
+  Future<void> _openRecent(RecentFile rf) async {
+    if (kIsWeb) return;
+    final f = File(rf.path);
+    if (!f.existsSync()) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${LanguageService.instance.s['app.cannotRead']}: ${rf.name}',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    await _loadPickedFile(rf.name, rf.path, null);
+  }
+
   void _closeFile(int index) {
     setState(() {
       _files.removeAt(index);
@@ -205,6 +228,13 @@ class _HomePageState extends State<HomePage>
                     )
                   : _buildEmptyState(context, isDark),
             ),
+            // 底部扩展状态栏
+            if (hasFile)
+              StatusBar(
+                key: ValueKey('status_${_files[_activeIndex].path}'),
+                file: _files[_activeIndex],
+                stats: FileStats.from(_files[_activeIndex]),
+              ),
           ],
         ),
       ),
@@ -501,6 +531,7 @@ class _HomePageState extends State<HomePage>
   Widget _buildEmptyState(BuildContext context, bool isDark) {
     final colorScheme = Theme.of(context).colorScheme;
     final s = LanguageService.instance.s;
+    final isNarrow = MediaQuery.sizeOf(context).width < 640;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -586,6 +617,9 @@ class _HomePageState extends State<HomePage>
             ),
           ),
           const SizedBox(height: 40),
+          // 最近打开列表
+          _buildRecentSection(context, isNarrow),
+          const SizedBox(height: 24),
           // 格式徽章墙（逐个弹入）
           Wrap(
             spacing: 8,
@@ -602,6 +636,126 @@ class _HomePageState extends State<HomePage>
         ],
       ),
     );
+  }
+
+  /// 最近打开文件列表（空状态主页显示）。
+  Widget _buildRecentSection(BuildContext context, bool narrow) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final s = LanguageService.instance.s;
+
+    return ListenableBuilder(
+      listenable: RecentFilesService.instance,
+      builder: (context, _) {
+        final files = RecentFilesService.instance.files;
+        if (files.isEmpty) {
+          return Text(
+            s['app.noRecent'],
+            style: TextStyle(
+              fontSize: 12.5,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+            ),
+          );
+        }
+        final shown = files.take(narrow ? 5 : 8).toList();
+        return Container(
+          constraints: const BoxConstraints(maxWidth: 560),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: colorScheme.onSurface.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.history, size: 15, color: colorScheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    s['app.recent'],
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const Spacer(),
+                  InkWell(
+                    onTap: () =>
+                        RecentFilesService.instance.clear(),
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      child: Text(
+                        s['app.clearRecent'],
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color:
+                              colorScheme.onSurfaceVariant.withValues(alpha: 0.8),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              for (final rf in shown)
+                InkWell(
+                  onTap: () => _openRecent(rf),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 5),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _iconFor(FileKind.fromFileName(rf.name)),
+                          size: 14,
+                          color: colorScheme.primary.withValues(alpha: 0.8),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            rf.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                        Text(
+                          _formatTime(rf.openedAt),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant
+                                .withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatTime(int epochMs) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(epochMs);
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m';
+    if (diff.inDays < 1) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return '${dt.month}/${dt.day}';
   }
 
   IconData _iconFor(FileKind kind) {

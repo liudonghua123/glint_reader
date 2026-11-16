@@ -7,12 +7,14 @@ import 'package:flutter/services.dart';
 
 import 'home_page.dart';
 import 'i18n.dart';
+import 'recent_files.dart';
 import 'settings.dart';
 
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppSettings.instance.load();
   await LanguageService.instance.load();
+  await RecentFilesService.instance.load();
   final initialFile = _initialFileFromArgs(args);
   runApp(initialFile != null
       ? GlintApp(initialFile: initialFile)

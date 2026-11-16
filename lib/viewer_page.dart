@@ -3,10 +3,12 @@ import 'package:re_editor/re_editor.dart';
 
 import 'highlight_service.dart';
 import 'i18n.dart';
+import 'markdown_view.dart';
 import 'models.dart';
 import 'settings.dart';
 
 /// 查看器页面：只读（可切换）高亮文本视图。
+/// Markdown 文件支持源码 / 渲染预览切换。
 class ViewerPage extends StatefulWidget {
   final OpenFile file;
   final bool wordWrap;
@@ -33,6 +35,7 @@ class ViewerPage extends StatefulWidget {
 
 class _ViewerPageState extends State<ViewerPage> {
   CodeLineEditingController? _controller;
+  bool _preview = true; // md 默认渲染预览
 
   @override
   void initState() {
@@ -58,9 +61,75 @@ class _ViewerPageState extends State<ViewerPage> {
   @override
   Widget build(BuildContext context) {
     final dark = widget.themeIsDark;
-    final codeTheme = HighlightService.buildTheme(dark);
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Markdown：源码 / 预览切换
+    if (widget.file.kind.isMarkdown) {
+      return Column(
+        children: [
+          // 切换条
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: dark ? const Color(0xFF161B22) : const Color(0xFFEDF1F5),
+              border: Border(
+                bottom: BorderSide(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.3),
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Spacer(),
+                SegmentedButton<bool>(
+                  segments: [
+                    ButtonSegment(
+                      value: true,
+                      label: Text(
+                        LanguageService.instance.s['viewer.preview'],
+                        style: const TextStyle(fontSize: 12.5),
+                      ),
+                      icon: const Icon(Icons.article_outlined, size: 15),
+                    ),
+                    ButtonSegment(
+                      value: false,
+                      label: Text(
+                        LanguageService.instance.s['viewer.source'],
+                        style: const TextStyle(fontSize: 12.5),
+                      ),
+                      icon: const Icon(Icons.code, size: 15),
+                    ),
+                  ],
+                  selected: {_preview},
+                  onSelectionChanged: (sel) =>
+                      setState(() => _preview = sel.first),
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _preview
+                ? MarkdownView(
+                    content: widget.file.content,
+                    themeIsDark: dark,
+                    fontSize: widget.fontSize,
+                  )
+                : _buildCodeEditor(dark, colorScheme),
+          ),
+        ],
+      );
+    }
+
+    return _buildCodeEditor(dark, colorScheme);
+  }
+
+  Widget _buildCodeEditor(bool dark, ColorScheme colorScheme) {
+    final codeTheme = HighlightService.buildTheme(dark);
     return CodeEditor(
       controller: _controller,
       readOnly: widget.readOnly,

@@ -7,7 +7,7 @@
 
 A cross-platform text file viewer with syntax highlighting, built with Flutter.
 
-Supports 30+ file formats including **Markdown, Diff/Patch, JSON, YAML, code files** and more.
+Supports 60+ file formats including **Markdown, Diff/Patch, JSON, YAML, code files** and more.
 
 [简体中文](README_zh.md)
 
@@ -19,7 +19,10 @@ Supports 30+ file formats including **Markdown, Diff/Patch, JSON, YAML, code fil
 
 ## Features
 
-- **Syntax highlighting** for 30+ formats: Markdown, Diff, JSON, YAML, XML, HTML, CSS, JS/TS, Python, Go, Rust, C/C++, Java, Dart, Shell, PowerShell, SQL, Dockerfile, Makefile, CSV and more (powered by [re_highlight](https://pub.dev/packages/re_highlight))
+- **Syntax highlighting** for 60+ formats: Markdown, Diff, JSON, YAML, XML, HTML, CSS, JS/TS, Python, Go, Rust, C/C++, Java, Kotlin, Swift, Dart, Scala, Haskell, Elixir, Clojure, Julia, Shell, PowerShell, SQL, GraphQL, Protobuf, LaTeX and more (powered by [re_highlight](https://pub.dev/packages/re_highlight))
+- **Markdown preview** — rendered view (headings, tables, code blocks) with source toggle
+- **Recent files** — home screen shows recently opened files, click to reopen
+- **Status bar** — file size, lines, characters, encoding; format-specific details (JSON validity, CSV rows/cols, diff +/- counts, headings/links/images for Markdown) expandable on click
 - **Multi-tab** viewing — open several files at once
 - **Search within file** (Ctrl+F) with match navigation
 - **Line numbers** and code folding indicator

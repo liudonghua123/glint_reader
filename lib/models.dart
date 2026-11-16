@@ -41,12 +41,38 @@ class FileKind {
     FileKind('lua', 'Lua', ['.lua']),
     FileKind('perl', 'Perl', ['.pl', '.pm']),
     FileKind('r', 'R', ['.r', '.R']),
+    FileKind('scala', 'Scala', ['.scala', '.sc']),
+    FileKind('haskell', 'Haskell', ['.hs', '.lhs']),
+    FileKind('elixir', 'Elixir', ['.ex', '.exs']),
+    FileKind('erlang', 'Erlang', ['.erl', '.hrl']),
+    FileKind('clojure', 'Clojure', ['.clj', '.cljs', '.edn']),
+    FileKind('objectivec', 'Objective-C', ['.m', '.mm']),
+    FileKind('groovy', 'Groovy', ['.groovy', '.gradle']),
+    FileKind('julia', 'Julia', ['.jl']),
+    FileKind('fortran', 'Fortran', ['.f90', '.f95', '.f', '.for']),
+    FileKind('pascal', 'Pascal', ['.pas', '.pp', '.dpr']),
+    FileKind('vbnet', 'Visual Basic', ['.vb', '.vbs']),
+    FileKind('matlab', 'MATLAB', ['.matlab']),
+    FileKind('vhdl', 'VHDL', ['.vhd', '.vhdl']),
+    FileKind('verilog', 'Verilog', ['.v', '.sv']),
+    FileKind('ada', 'Ada', ['.adb', '.ads']),
+    FileKind('ocaml', 'OCaml', ['.ml', '.mli']),
+    FileKind('nim', 'Nim', ['.nim']),
+    FileKind('crystal', 'Crystal', ['.cr']),
+    FileKind('graphql', 'GraphQL', ['.graphql', '.gql']),
+    FileKind('protobuf', 'Protocol Buffers', ['.proto']),
+    FileKind('nginx', 'Nginx', ['nginx', 'nginx.conf', '.conf2']),
+    FileKind('apache', 'Apache Config', ['httpd.conf', '.htaccess']),
+    FileKind('cmake', 'CMake', ['cmakelists.txt', '.cmake']),
+    FileKind('nsis', 'NSIS', ['.nsi', '.nsh']),
+    FileKind('latex', 'LaTeX / TeX', ['.tex', '.sty', '.cls']),
+    FileKind('markdown', 'Markdown', ['.mdown']),
   ];
 
   /// 根据文件名推断语言，找不到则回退 plaintext。
   static FileKind fromFileName(String fileName) {
     final lower = fileName.toLowerCase();
-    // 无扩展名的特殊文件名（dockerfile / makefile）
+    // 无扩展名的特殊文件名（dockerfile / makefile 等）
     for (final k in all) {
       if (k.extensions.any((e) => !e.startsWith('.') && lower == e)) {
         return k;
@@ -60,6 +86,12 @@ class FileKind {
     }
     return plaintext;
   }
+
+  /// 是否为 Markdown（支持渲染预览）。
+  bool get isMarkdown => id == 'markdown';
+
+  /// 是否支持语法高亮（re_highlight 内置该语言）。
+  bool get isHighlightable => id != 'plaintext';
 
   static const plaintext = FileKind('plaintext', 'Plain Text', ['.txt']);
 }
