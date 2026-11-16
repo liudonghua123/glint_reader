@@ -48,3 +48,6 @@ app.*.map.json
 android/keystore.properties
 android/keystore/*.jks
 android/keystore/*.keystore
+
+# WorkBuddy local
+.workbuddy/

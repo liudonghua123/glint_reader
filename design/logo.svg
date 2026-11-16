@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- 背景：深邃夜空蓝，斜向渐变 -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1B2A4A"/>
+      <stop offset="0.55" stop-color="#16213C"/>
+      <stop offset="1" stop-color="#101828"/>
+    </linearGradient>
+    <!-- 书页：暖白渐变 -->
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFDF6"/>
+      <stop offset="1" stop-color="#EFE7D2"/>
+    </linearGradient>
+    <!-- 闪光金色渐变 -->
+    <linearGradient id="glint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD97A"/>
+      <stop offset="0.5" stop-color="#F5B84A"/>
+      <stop offset="1" stop-color="#E8963C"/>
+    </linearGradient>
+    <!-- 中央微光 -->
+    <radialGradient id="glow" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#3D5A96" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#3D5A96" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 圆角方形背景（squircle 风格） -->
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1024" height="1024" rx="224" fill="url(#glow)"/>
+
+  <!-- 打开的书：左右两页 -->
+  <g>
+    <!-- 左页 -->
+    <path d="M 168 400
+             C 260 350 380 350 500 416
+             L 500 792
+             C 380 726 260 726 168 776
+             Z"
+          fill="url(#page)"/>
+    <!-- 右页 -->
+    <path d="M 856 400
+             C 764 350 644 350 524 416
+             L 524 792
+             C 644 726 764 726 856 776
+             Z"
+          fill="url(#page)"/>
+    <!-- 左页文字行 -->
+    <g stroke="#B9AE93" stroke-width="26" stroke-linecap="round" opacity="0.75">
+      <line x1="248" y1="464" x2="420" y2="454"/>
+      <line x1="248" y1="536" x2="440" y2="526"/>
+      <line x1="248" y1="608" x2="420" y2="598"/>
+      <line x1="248" y1="680" x2="440" y2="670"/>
+    </g>
+    <!-- 右页文字行 -->
+    <g stroke="#B9AE93" stroke-width="26" stroke-linecap="round" opacity="0.75">
+      <line x1="604" y1="454" x2="776" y2="464"/>
+      <line x1="584" y1="526" x2="776" y2="536"/>
+      <line x1="604" y1="598" x2="776" y2="608"/>
+      <line x1="584" y1="670" x2="776" y2="680"/>
+    </g>
+    <!-- 中缝阴影 -->
+    <rect x="500" y="416" width="24" height="376" fill="#8A7E62" opacity="0.45"/>
+  </g>
+
+  <!-- 主闪光：书上方居中，四角星 -->
+  <path fill="url(#glint)" d="M 512 118
+           L 537 223
+           L 642 248
+           L 537 273
+           L 512 378
+           L 487 273
+           L 382 248
+           L 487 223
+           Z"/>
+  <!-- 右上小闪光 -->
+  <path fill="url(#glint)" opacity="0.92" d="M 762 108
+           L 776 164
+           L 832 178
+           L 776 192
+           L 762 248
+           L 748 192
+           L 692 178
+           L 748 164
+           Z"/>
+  <!-- 左侧更小闪光 -->
+  <path fill="url(#glint)" opacity="0.7" d="M 268 208
+           L 278 250
+           L 320 260
+           L 278 270
+           L 268 312
+           L 258 270
+           L 216 260
+           L 258 250
+           Z"/>
+</svg>

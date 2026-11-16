@@ -1,5 +1,9 @@
 # Glint Reader
 
+<div align="center">
+  <img src="design/logo.svg" alt="Glint Reader" width="128"/>
+</div>
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Flutter](https://img.shields.io/badge/Flutter-3.50-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Deploy to GitHub Pages](https://github.com/liudonghua123/glint_reader/actions/workflows/gh-pages.yml/badge.svg)](https://github.com/liudonghua123/glint_reader/actions/workflows/gh-pages.yml)
