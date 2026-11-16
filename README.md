@@ -61,6 +61,8 @@ Grab pre-built binaries from the [Releases](https://github.com/liudonghua123/gli
 | Platform | Artifact |
 | --- | --- |
 | Windows | `glint_reader-windows-x64.zip` |
+| macOS | `glint_reader-macos.zip` |
+| Linux | `glint_reader-linux-x64.tar.gz` |
 | Android | `glint_reader-android.apk` |
 | Web | deployed to [GitHub Pages](https://liudonghua123.github.io/glint_reader/) |
 

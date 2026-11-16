@@ -61,6 +61,8 @@ flutter build web --release --base-href /glint_reader/
 | 平台 | 产物 |
 | --- | --- |
 | Windows | `glint_reader-windows-x64.zip` |
+| macOS | `glint_reader-macos.zip` |
+| Linux | `glint_reader-linux-x64.tar.gz` |
 | Android | `glint_reader-android.apk` |
 | Web | 部署于 [GitHub Pages](https://liudonghua123.github.io/glint_reader/) |
 
