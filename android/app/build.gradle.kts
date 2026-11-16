@@ -83,3 +83,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    // FileProvider（androidx.core）用于更新 APK 安装
+    implementation("androidx.core:core:1.13.1")
+}

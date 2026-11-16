@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'i18n.dart';
@@ -56,6 +58,55 @@ Future<void> showUpdateCheck(BuildContext context) async {
   );
 }
 
+/// 启动后自动静默检测更新，发现新版本弹出更新对话框。
+/// 挂在 MaterialApp.builder 中，静默失败（不打扰启动流程）。
+class AutoUpdateChecker extends StatefulWidget {
+  final Widget child;
+
+  const AutoUpdateChecker({super.key, required this.child});
+
+  @override
+  State<AutoUpdateChecker> createState() => _AutoUpdateCheckerState();
+}
+
+class _AutoUpdateCheckerState extends State<AutoUpdateChecker> {
+  Timer? _timer;
+  bool _checked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 启动 3 秒后静默检测（等首帧渲染完 + 网络就绪）
+    _timer = Timer(const Duration(seconds: 3), _check);
+  }
+
+  Future<void> _check() async {
+    if (_checked || !mounted) return;
+    _checked = true;
+    try {
+      final info = await UpdateService.instance.checkForUpdate();
+      if (info == null || !mounted) return;
+      // 有下载中的任务不弹（对话框会由用户手动打开）
+      if (UpdateService.instance.isDownloading) return;
+      showDialog<void>(
+        context: context,
+        builder: (_) => UpdateDialog(info: info),
+      );
+    } catch (_) {
+      // 静默失败
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
+}
+
 /// 获取根 navigator 的 context，保证对话框覆盖全屏。
 BuildContext navigatorKeyContext(BuildContext context) {
   Navigator.of(context, rootNavigator: true).context;
@@ -63,6 +114,7 @@ BuildContext navigatorKeyContext(BuildContext context) {
 }
 
 /// 更新确认 + 下载进度对话框。
+/// 打开时自动检测：已下载 → 直接可安装；有 .part → 断点续传。
 class UpdateDialog extends StatefulWidget {
   final UpdateInfo info;
 
@@ -72,13 +124,53 @@ class UpdateDialog extends StatefulWidget {
   State<UpdateDialog> createState() => _UpdateDialogState();
 }
 
-enum _UpdatePhase { confirm, downloading, done, error }
+enum _UpdatePhase { checking, confirm, downloading, done, error }
 
 class _UpdateDialogState extends State<UpdateDialog> {
-  _UpdatePhase _phase = _UpdatePhase.confirm;
+  _UpdatePhase _phase = _UpdatePhase.checking;
   double _progress = 0;
   String? _downloadPath;
   String? _error;
+  bool _resumed = false; // 是否为续传（显示提示）
+
+  @override
+  void initState() {
+    super.initState();
+    _detectExisting();
+  }
+
+  /// 打开对话框时检测已有下载：完整文件直接可安装，.part 显示可续传。
+  Future<void> _detectExisting() async {
+    final service = UpdateService.instance;
+    // 已在下载中（其他入口触发）：直接进入下载阶段挂到同一进度
+    if (service.isDownloading) {
+      if (!mounted) return;
+      setState(() => _phase = _UpdatePhase.downloading);
+      return;
+    }
+    try {
+      final existing = await service.findDownloadedFile(widget.info);
+      if (!mounted) return;
+      if (existing != null) {
+        setState(() {
+          _phase = _UpdatePhase.done;
+          _downloadPath = existing;
+        });
+        return;
+      }
+      final partial = await service.partialBytes(widget.info);
+      if (!mounted) return;
+      setState(() {
+        _phase = _UpdatePhase.confirm;
+        _resumed = partial > 0;
+        if (widget.info.assetSize > 0 && partial > 0) {
+          _progress = partial / widget.info.assetSize;
+        }
+      });
+    } catch (_) {
+      if (mounted) setState(() => _phase = _UpdatePhase.confirm);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -161,6 +253,25 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ],
               ),
             ],
+            if (_resumed && _phase == _UpdatePhase.confirm) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.history, size: 14,
+                      color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _resumedText(s),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (_phase == _UpdatePhase.error) ...[
               const SizedBox(height: 12),
               Text(
@@ -194,17 +305,19 @@ class _UpdateDialogState extends State<UpdateDialog> {
             child: Text(s['update.openPage']),
           )
         else ...[
-          if (_phase == _UpdatePhase.confirm)
+          if (_phase == _UpdatePhase.confirm) ...[
             TextButton(
               onPressed: () =>
                   UpdateService.openReleasePage(widget.info.releasePageUrl),
               child: Text(s['update.openPage']),
             ),
-          if (_phase == _UpdatePhase.confirm)
             FilledButton(
               onPressed: _startDownload,
-              child: Text(s['update.download']),
+              child: Text(
+                _resumed ? s['update.resume'] : s['update.download'],
+              ),
             ),
+          ],
           if (_phase == _UpdatePhase.done)
             FilledButton(
               onPressed: () {
@@ -219,7 +332,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
               child: Text(s['update.retry']),
             ),
         ],
-        if (_phase != _UpdatePhase.downloading)
+        if (_phase != _UpdatePhase.downloading &&
+            _phase != _UpdatePhase.checking)
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(s['update.later']),
@@ -228,13 +342,20 @@ class _UpdateDialogState extends State<UpdateDialog> {
     );
   }
 
+  String _resumedText(S s) {
+    final pct = widget.info.assetSize > 0
+        ? '${(_progress * 100).toStringAsFixed(0)}%'
+        : '';
+    return s['update.resumed'].replaceAll('%s', pct);
+  }
+
   bool get _assetMissing => widget.info.assetUrl == widget.info.releasePageUrl;
 
   Future<void> _startDownload() async {
     setState(() {
       _phase = _UpdatePhase.downloading;
-      _progress = 0;
       _error = null;
+      if (!_resumed) _progress = 0;
     });
     try {
       final path = await UpdateService.instance
@@ -245,6 +366,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         setState(() {
           _phase = _UpdatePhase.done;
           _downloadPath = path;
+          _resumed = false;
         });
       }
     } catch (e) {

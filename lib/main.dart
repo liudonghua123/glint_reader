@@ -9,6 +9,7 @@ import 'home_page.dart';
 import 'i18n.dart';
 import 'recent_files.dart';
 import 'settings.dart';
+import 'update_dialog.dart';
 import 'update_service.dart';
 
 void main(List<String> args) async {
@@ -63,6 +64,9 @@ class GlintApp extends StatelessWidget {
           locale: Locale(LanguageService.instance.language.code),
           supportedLocales: const [Locale('en'), Locale('zh')],
           home: HomePage(initialFile: initialFile),
+          // 启动后自动静默检测更新，发现新版本弹出更新对话框
+          builder: (context, child) =>
+              AutoUpdateChecker(child: child ?? const SizedBox.shrink()),
         );
       },
     );
