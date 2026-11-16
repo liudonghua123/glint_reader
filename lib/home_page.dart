@@ -26,11 +26,21 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage>
-    with SingleTickerProviderStateMixin {
-  final List<OpenFile> _files = [];
-  int _activeIndex = -1;
-  bool _readOnly = true; // 阅读器默认只读，可切换为编辑
+  /// 标签页项：文件或主页（Chrome 式新标签页）。
+  class _TabItem {
+    final OpenFile? file;
+    final int homeId; // 主页标签唯一 id（文件标签为 -1）
+    _TabItem.home(int id) : file = null, homeId = id;
+    _TabItem.file(OpenFile f) : file = f, homeId = -1;
+    bool get isHome => file == null;
+  }
+
+  class _HomePageState extends State<HomePage>
+      with SingleTickerProviderStateMixin {
+    final List<_TabItem> _tabs = [];
+    int _activeIndex = -1;
+    int _nextHomeId = 1; // 主页标签自增 id
+    bool _readOnly = true; // 阅读器默认只读，可切换为编辑
 
   // Android 返回手势：第一次提示，再按退出
   DateTime? _lastBackPress;
@@ -111,19 +121,44 @@ class _HomePageState extends State<HomePage>
 
   void _openContent(String name, String content, {String? path}) {
     setState(() {
-      _files.add(OpenFile(
+      final item = _TabItem.file(OpenFile(
         path: path ?? name,
         name: name,
         content: content,
         kind: FileKind.fromFileName(name),
       ));
-      _activeIndex = _files.length - 1;
+      // 在主页标签中打开时，原地替换该主页标签（Chrome 行为）
+      if (_activeIndex >= 0 &&
+          _activeIndex < _tabs.length &&
+          _tabs[_activeIndex].isHome) {
+        _tabs[_activeIndex] = item;
+      } else {
+        _tabs.add(item);
+        _activeIndex = _tabs.length - 1;
+      }
     });
     // 记录到最近打开（web 下 path 为文件名，去重以 path 为准）
     RecentFilesService.instance.record(path ?? name, name);
   }
 
-  bool get hasFile => _files.isNotEmpty && _activeIndex >= 0;
+  /// Chrome 式新标签页：新建一个主页标签。
+  void _newHomeTab() {
+    setState(() {
+      _tabs.add(_TabItem.home(_nextHomeId++));
+      _activeIndex = _tabs.length - 1;
+    });
+  }
+
+  bool get hasFile =>
+      _tabs.isNotEmpty &&
+      _activeIndex >= 0 &&
+      !_tabs[_activeIndex].isHome;
+
+  /// 当前激活标签是否为主页页。
+  bool get _activeIsHome =>
+      _tabs.isNotEmpty &&
+      _activeIndex >= 0 &&
+      _tabs[_activeIndex].isHome;
 
   /// 支持的扩展名（同时用于 Android 上自过滤）。
   static const _supportedExtensions = [
@@ -234,9 +269,9 @@ class _HomePageState extends State<HomePage>
 
   void _closeFile(int index) {
     setState(() {
-      _files.removeAt(index);
-      if (_activeIndex >= _files.length) {
-        _activeIndex = _files.length - 1;
+      _tabs.removeAt(index);
+      if (_activeIndex >= _tabs.length) {
+        _activeIndex = _tabs.length - 1;
       }
     });
   }
@@ -257,13 +292,14 @@ class _HomePageState extends State<HomePage>
         body: Column(
           children: [
             _buildToolbar(context, isDark),
-            if (_files.isNotEmpty) _buildTabs(context, isDark),
+            if (_tabs.isNotEmpty) _buildTabs(context, isDark),
             Expanded(
               child: hasFile
                   ? ViewerPage(
                       key: ValueKey(
-                          _files[_activeIndex].path + _activeIndex.toString()),
-                      file: _files[_activeIndex],
+                          _tabs[_activeIndex].file!.path +
+                              _activeIndex.toString()),
+                      file: _tabs[_activeIndex].file!,
                       wordWrap: AppSettings.instance.wordWrap,
                       fontSize: AppSettings.instance.fontSize,
                       lineHeight: AppSettings.instance.lineHeight,
@@ -271,14 +307,20 @@ class _HomePageState extends State<HomePage>
                       readOnly: _readOnly,
                       themeIsDark: isDark,
                     )
-                  : _buildEmptyState(context, isDark),
+                  : (_activeIsHome
+                      // Chrome 式主页标签：复用空状态主页内容
+                      ? KeyedSubtree(
+                          key: ValueKey('home_${_tabs[_activeIndex].homeId}'),
+                          child: _buildEmptyState(context, isDark),
+                        )
+                      : _buildEmptyState(context, isDark)),
             ),
             // 底部扩展状态栏
             if (hasFile)
               StatusBar(
-                key: ValueKey('status_${_files[_activeIndex].path}'),
-                file: _files[_activeIndex],
-                stats: FileStats.from(_files[_activeIndex]),
+                key: ValueKey('status_${_tabs[_activeIndex].file!.path}'),
+                file: _tabs[_activeIndex].file!,
+                stats: FileStats.from(_tabs[_activeIndex].file!),
               ),
           ],
         ),
@@ -286,10 +328,10 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  /// 返回手势：有关闭的标签先关标签，没有标签时连按两次退出。
+  /// 返回手势：有关闭的标签（文件或主页）先关标签，没有标签时连按两次退出。
   void _handleBackGesture() {
     // 1) 先关当前标签
-    if (hasFile) {
+    if (_tabs.isNotEmpty && _activeIndex >= 0) {
       _closeFile(_activeIndex);
       return;
     }
@@ -462,11 +504,11 @@ class _HomePageState extends State<HomePage>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(_iconFor(_files[_activeIndex].kind),
+                  Icon(_iconFor(_tabs[_activeIndex].file!.kind),
                       size: 13, color: colorScheme.primary),
                   const SizedBox(width: 6),
                   Text(
-                    _files[_activeIndex].kind.label,
+                    _tabs[_activeIndex].file!.kind.label,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -480,7 +522,7 @@ class _HomePageState extends State<HomePage>
                     color: colorScheme.primary.withValues(alpha: 0.3),
                   ),
                   Text(
-                    '${_files[_activeIndex].content.split('\n').length} ${LanguageService.instance.s['app.lines']}',
+                    '${_tabs[_activeIndex].file!.content.split('\n').length} ${LanguageService.instance.s['app.lines']}',
                     style: TextStyle(
                       fontSize: 12,
                       color: colorScheme.primary.withValues(alpha: 0.85),
@@ -517,18 +559,24 @@ class _HomePageState extends State<HomePage>
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-              itemCount: _files.length,
+              itemCount: _tabs.length,
               itemBuilder: (context, i) {
-          final file = _files[i];
+          final tab = _tabs[i];
           final active = i == _activeIndex;
-          // 标签只显示简单文件名（兼容 name 里误带路径的情况）
-          final displayName =
-              file.name.replaceAll('\\', '/').split('/').last;
+          // 主页标签显示「主页」+ house 图标；文件标签显示简单文件名
+          final displayName = tab.isHome
+              ? LanguageService.instance.s['app.homeTab']
+              : tab.file!.name.replaceAll('\\', '/').split('/').last;
+          final icon = tab.isHome
+              ? Icons.home_outlined
+              : _iconFor(tab.file!.kind);
           return Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Tooltip(
-              // 悬停 / 长按显示完整路径
-              message: file.path,
+              // 悬停 / 长按显示完整路径（主页标签不提示）
+              message: tab.isHome
+                  ? LanguageService.instance.s['app.homeTab']
+                  : tab.file!.path,
               waitDuration: const Duration(milliseconds: 400),
               child: Material(
               color: active
@@ -552,7 +600,7 @@ class _HomePageState extends State<HomePage>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_iconFor(file.kind),
+                      Icon(icon,
                           size: 14,
                           color: active
                               ? colorScheme.primary
@@ -577,17 +625,17 @@ class _HomePageState extends State<HomePage>
               ),
             ),
           ),
-          );
-        },
+        );
+      },
             ),
           ),
-          // Chrome 式「+」新建标签（打开文件）
+          // Chrome 式「+」新建主页标签
           Padding(
             padding: const EdgeInsets.only(left: 2, right: 6),
             child: Tooltip(
-              message: LanguageService.instance.s['app.openFile'],
+              message: LanguageService.instance.s['app.newTab'],
               child: InkWell(
-                onTap: _openFilePicker,
+                onTap: _newHomeTab,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.all(6),
