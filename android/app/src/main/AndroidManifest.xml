@@ -24,6 +24,22 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- 作为文本文件查看器：响应系统“打开方式”（文件管理器 / 附件 / 下载） -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/*"/>
+                <data android:mimeType="application/json"/>
+                <data android:mimeType="application/xml"/>
+                <data android:mimeType="application/yaml"/>
+                <data android:mimeType="application/x-yaml"/>
+                <data android:mimeType="application/toml"/>
+                <data android:mimeType="application/javascript"/>
+                <data android:mimeType="application/x-sh"/>
+                <data android:mimeType="application/sql"/>
+                <data android:mimeType="application/x-httpd-php"/>
+                <data android:mimeType="application/rss+xml"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

@@ -73,25 +73,33 @@ class _HomePageState extends State<HomePage>
 
   /// 接收 Android 端通过 MethodChannel 传来的文件。
   Future<void> _setupAndroidFileIntents() async {
+    void handleArgs(Map<String, dynamic> args) {
+      final name = args['name'] as String? ?? 'unknown';
+      final content = args['content'] as String?;
+      final error = args['error'] as String?;
+      if (!mounted) return;
+      if (content != null) {
+        _openContent(name, content, path: name);
+      } else if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${LanguageService.instance.s['app.cannotRead']} $name: $error',
+            ),
+          ),
+        );
+      }
+    }
+
     _fileChannel.setMethodCallHandler((call) async {
       if (call.method == 'onFile' && call.arguments is Map) {
-        final args = Map<String, dynamic>.from(call.arguments as Map);
-        final name = args['name'] as String? ?? 'unknown';
-        final content = args['content'] as String?;
-        if (content != null) {
-          _openContent(name, content, path: name);
-        }
+        handleArgs(Map<String, dynamic>.from(call.arguments as Map));
       }
     });
     try {
       final initial = await _fileChannel.invokeMethod('getInitialFile');
       if (initial != null && initial is Map) {
-        final args = Map<String, dynamic>.from(initial);
-        final name = args['name'] as String? ?? 'unknown';
-        final content = args['content'] as String?;
-        if (content != null && mounted) {
-          _openContent(name, content, path: name);
-        }
+        handleArgs(Map<String, dynamic>.from(initial));
       }
     } on PlatformException {
       // 忽略
@@ -176,29 +184,28 @@ class _HomePageState extends State<HomePage>
         _handleBackGesture();
       },
       child: Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              _buildToolbar(context, isDark),
-              if (_files.isNotEmpty) _buildTabs(context, isDark),
-              Expanded(
-                child: hasFile
-                    ? ViewerPage(
-                        key: ValueKey(
-                            _files[_activeIndex].path + _activeIndex.toString()),
-                        file: _files[_activeIndex],
-                        wordWrap: AppSettings.instance.wordWrap,
-                        fontSize: AppSettings.instance.fontSize,
-                        lineHeight: AppSettings.instance.lineHeight,
-                        showLineNumbers: AppSettings.instance.showLineNumbers,
-                        readOnly: _readOnly,
-                        themeIsDark: isDark,
-                      )
-                    : _buildEmptyState(context, isDark),
-              ),
-            ],
-          ),
+        // 不再用 SafeArea 顶部内边距：工具栏渐变延伸到状态栏后面，
+        // 由 _buildToolbar 自行用 MediaQuery.padding.top 预留状态栏高度。
+        body: Column(
+          children: [
+            _buildToolbar(context, isDark),
+            if (_files.isNotEmpty) _buildTabs(context, isDark),
+            Expanded(
+              child: hasFile
+                  ? ViewerPage(
+                      key: ValueKey(
+                          _files[_activeIndex].path + _activeIndex.toString()),
+                      file: _files[_activeIndex],
+                      wordWrap: AppSettings.instance.wordWrap,
+                      fontSize: AppSettings.instance.fontSize,
+                      lineHeight: AppSettings.instance.lineHeight,
+                      showLineNumbers: AppSettings.instance.showLineNumbers,
+                      readOnly: _readOnly,
+                      themeIsDark: isDark,
+                    )
+                  : _buildEmptyState(context, isDark),
+            ),
+          ],
         ),
       ),
     );
@@ -234,9 +241,13 @@ class _HomePageState extends State<HomePage>
 
   Widget _buildToolbar(BuildContext context, bool isDark) {
     final colorScheme = Theme.of(context).colorScheme;
+    // Android edge-to-edge：顶部预留状态栏高度，渐变延伸到状态栏后面
+    final topInset = MediaQuery.paddingOf(context).top;
+    // 窄屏（手机竖屏）下精简布局：隐藏标题文字 / 按钮文字 / 文件信息胶囊
+    final isNarrow = MediaQuery.sizeOf(context).width < 640;
+
     return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
+      padding: EdgeInsets.fromLTRB(12, topInset, 12, 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -257,6 +268,7 @@ class _HomePageState extends State<HomePage>
           Container(
             width: 30,
             height: 30,
+            margin: const EdgeInsets.only(top: 10, bottom: 10),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
@@ -274,42 +286,54 @@ class _HomePageState extends State<HomePage>
             ),
             child: const Icon(Icons.auto_stories, size: 17, color: Colors.white),
           ),
-          const SizedBox(width: 10),
-          Text(
-            'Glint',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
-          ),
-          Text(
-            ' Reader',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w400,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: 20),
-          // 打开文件按钮
-          FilledButton.tonalIcon(
-            onPressed: _openFilePicker,
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.primary.withValues(alpha: 0.10),
-              foregroundColor: colorScheme.primary,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(9),
-              ),
-            ).copyWith(
-              overlayColor: WidgetStateProperty.all(
-                colorScheme.primary.withValues(alpha: 0.14),
+          // 标题文字：窄屏隐藏，给操作按钮让出空间
+          if (!isNarrow) ...[
+            const SizedBox(width: 10),
+            Text(
+              'Glint',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.3,
               ),
             ),
-            icon: const Icon(Icons.folder_open, size: 17),
-            label: Text(LanguageService.instance.s['app.openFile'],
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-          ),
+            Text(
+              ' Reader',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w400,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(width: 12),
+          // 打开文件按钮：窄屏只显示图标
+          if (!isNarrow)
+            FilledButton.tonalIcon(
+              onPressed: _openFilePicker,
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.primary.withValues(alpha: 0.10),
+                foregroundColor: colorScheme.primary,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 10),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(9),
+                ),
+              ).copyWith(
+                overlayColor: WidgetStateProperty.all(
+                  colorScheme.primary.withValues(alpha: 0.14),
+                ),
+              ),
+              icon: const Icon(Icons.folder_open, size: 17),
+              label: Text(LanguageService.instance.s['app.openFile'],
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            )
+          else
+            _ToolbarToggle(
+              icon: Icons.folder_open,
+              tooltip: LanguageService.instance.s['app.openFile'],
+              active: false,
+              onTap: _openFilePicker,
+            ),
           const SizedBox(width: 6),
           // 分隔线
           Container(
@@ -349,8 +373,8 @@ class _HomePageState extends State<HomePage>
             },
           ),
           const Spacer(),
-          // 文件信息胶囊
-          if (hasFile)
+          // 文件信息胶囊：窄屏隐藏（文件名已显示在标签页上）
+          if (hasFile && !isNarrow)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(
