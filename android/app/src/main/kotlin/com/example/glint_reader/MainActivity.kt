@@ -1,8 +1,10 @@
 package com.example.glint_reader
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
@@ -13,6 +15,10 @@ import java.io.File
 class MainActivity : FlutterActivity() {
     private val channelName = "glint_reader/files"
     private var pendingMethodChannel: MethodChannel? = null
+
+    // 文件选择请求码与挂起的 Result
+    private val pickFileRequest = 4201
+    private var pendingPickResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -37,10 +43,89 @@ class MainActivity : FlutterActivity() {
                             }
                         }
                     }
+                    "pickFile" -> {
+                        if (pendingPickResult != null) {
+                            result.error("ALREADY_ACTIVE", "A pick is already in progress", null)
+                        } else {
+                            pendingPickResult = result
+                            launchFilePicker()
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
         pendingMethodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName)
+    }
+
+    /**
+     * 用 ACTION_GET_CONTENT 直接调起文件管理器浏览视图：
+     * - 多数 ROM 上 GET_CONTENT 直达文件列表，而非 OPEN_DOCUMENT 的
+     *   「最近 / 收藏」聚合首页
+     * - EXTRA_INITIAL_URI 指向 Download，打开即文件列表（API 26+）
+     * 选中后复制到应用缓存目录，返回可读路径。
+     */
+    private fun launchFilePicker() {
+        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // 落在 Download：用户直接看到文件列表
+                putExtra(
+                    DocumentsContract.EXTRA_INITIAL_URI,
+                    DocumentsContract.buildRootUri(
+                        "com.android.providers.downloads.documents",
+                        "downloads"
+                    )
+                )
+            }
+        }
+        try {
+            startActivityForResult(
+                Intent.createChooser(intent, "打开文件"),
+                pickFileRequest
+            )
+        } catch (e: Exception) {
+            pendingPickResult?.error("NO_PICKER", e.message, null)
+            pendingPickResult = null
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != pickFileRequest) return
+        val result = pendingPickResult
+        pendingPickResult = null
+        if (result == null) return
+
+        if (resultCode != Activity.RESULT_OK || data?.data == null) {
+            result.success(null) // 用户取消
+            return
+        }
+        try {
+            val path = copyUriToCache(data.data!!)
+            result.success(path)
+        } catch (e: Exception) {
+            result.error("COPY_FAILED", e.message, null)
+        }
+    }
+
+    /** 把 content:// 复制到缓存目录，返回文件路径。 */
+    private fun copyUriToCache(uri: Uri): String {
+        val displayName = queryDisplayName(uri)
+            ?: "picked_${System.currentTimeMillis()}"
+        // 补扩展名（部分提供方不带显示名扩展）
+        val name = if (displayName.contains('.')) displayName
+            else "$displayName.txt"
+        val dir = File(cacheDir, "picked").apply {
+            if (!exists()) mkdirs()
+        }
+        val dest = File(dir, name)
+        contentResolver.openInputStream(uri)?.use { input ->
+            dest.outputStream().use { output ->
+                input.copyTo(output)
+            }
+        } ?: throw IllegalStateException("Cannot open $uri")
+        return dest.absolutePath
     }
 
     override fun onNewIntent(intent: Intent) {

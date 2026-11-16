@@ -135,35 +135,52 @@ class _HomePageState extends State<HomePage>
   ];
 
   Future<void> _openFilePicker() async {
-    // Android 的 ACTION_OPEN_DOCUMENT 在部分 ROM 上显示为内嵌文档页，
-    // 用 FileType.any 调起标准文件选择器，选中后自行按扩展名过滤。
-    final isAndroid = !kIsWeb && Platform.isAndroid;
-    final files = await FilePicker.pickFiles(
-      dialogTitle: LanguageService.instance.s['app.selectFile'],
-      type: isAndroid ? FileType.any : FileType.custom,
-      allowedExtensions: isAndroid ? null : _supportedExtensions,
-    );
-    for (final f in files) {
-      final ext = f.name.contains('.')
-          ? f.name.split('.').last.toLowerCase()
-          : '';
-      final nameNoPath = f.name.replaceAll('\\', '/').split('/').last;
-      // Android（FileType.any）下过滤不支持的格式
-      if (isAndroid &&
-          ext.isNotEmpty &&
-          !_supportedExtensions.contains(ext) &&
-          FileKind.fromFileName(nameNoPath) == FileKind.plaintext) {
-        if (mounted) {
+    // Android：走原生 ACTION_GET_CONTENT 直达文件管理器浏览视图
+    //（file_picker 的 OPEN_DOCUMENT 在部分 ROM 显示为「最近」聚合首页）。
+    if (!kIsWeb && Platform.isAndroid) {
+      try {
+        final path = await _fileChannel.invokeMethod<String>('pickFile');
+        if (path == null) return; // 用户取消
+        final name = path.replaceAll('\\', '/').split('/').last;
+        final ext = name.contains('.')
+            ? name.split('.').last.toLowerCase()
+            : '';
+        if (ext.isNotEmpty &&
+            !_supportedExtensions.contains(ext) &&
+            FileKind.fromFileName(name) == FileKind.plaintext) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '${LanguageService.instance.s['app.unsupported']}: $name',
+                ),
+              ),
+            );
+          }
+          return;
+        }
+        await _loadPickedFile(name, path, null);
+      } on PlatformException catch (e) {
+        if (mounted && e.code != 'ALREADY_ACTIVE') {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                '${LanguageService.instance.s['app.unsupported']}: ${f.name}',
+                '${LanguageService.instance.s['app.cannotRead']}: ${e.message}',
               ),
             ),
           );
         }
-        continue;
       }
+      return;
+    }
+    // 桌面端 / Web：file_picker
+    final files = await FilePicker.pickFiles(
+      dialogTitle: LanguageService.instance.s['app.selectFile'],
+      type: FileType.custom,
+      allowedExtensions: _supportedExtensions,
+    );
+    for (final f in files) {
+      final nameNoPath = f.name.replaceAll('\\', '/').split('/').last;
       await _loadPickedFile(nameNoPath, f.path, f);
     }
   }
