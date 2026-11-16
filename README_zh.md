@@ -20,7 +20,7 @@
 ## 功能特性
 
 - **语法高亮**支持 60+ 种格式：Markdown、Diff、JSON、YAML、XML、HTML、CSS、JS/TS、Python、Go、Rust、C/C++、Java、Kotlin、Swift、Dart、Scala、Haskell、Elixir、Clojure、Julia、Shell、PowerShell、SQL、GraphQL、Protobuf、LaTeX 等（基于 [re_highlight](https://pub.dev/packages/re_highlight)）
-- **Markdown & HTML 预览**，渲染视图（标题、表格、代码块 / 内联 HTML），可切换源码
+- **Markdown & HTML 预览**，Markdown 内联渲染；HTML 使用真实 WebView 渲染（Windows WebView2 / macOS WKWebView / Android WebView），自动注入深色配色，均可切换源码
 - **最近打开**，主页显示最近打开的文件，点击即可重新打开
 - **底部状态栏**，文件大小、行数、字符数、编码；特定格式显示专属详情（JSON 有效性、CSV 行列数、Diff 增删行数、Markdown 标题/链接/图片数），点击可展开
 - **应用内更新**，启动后自动静默检测 + 手动检查；下载支持断点续传（自动识别已下载部分）；Android 下载完成后直接调起系统安装器安装

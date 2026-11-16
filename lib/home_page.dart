@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 
+import 'badge_marquee.dart';
 import 'models.dart';
 import 'i18n.dart';
 import 'recent_files.dart';
@@ -465,11 +466,15 @@ class _HomePageState extends State<HomePage>
           ),
         ),
       ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        itemCount: _files.length,
-        itemBuilder: (context, i) {
+      child: Row(
+        children: [
+          // 标签列表（可横向滚动）
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              itemCount: _files.length,
+              itemBuilder: (context, i) {
           final file = _files[i];
           final active = i == _activeIndex;
           // 标签只显示简单文件名（兼容 name 里误带路径的情况）
@@ -530,6 +535,28 @@ class _HomePageState extends State<HomePage>
           ),
           );
         },
+            ),
+          ),
+          // Chrome 式「+」新建标签（打开文件）
+          Padding(
+            padding: const EdgeInsets.only(left: 2, right: 6),
+            child: Tooltip(
+              message: LanguageService.instance.s['app.openFile'],
+              child: InkWell(
+                onTap: _openFilePicker,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(6),
+                  child: Icon(
+                    Icons.add,
+                    size: 18,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -627,19 +654,11 @@ class _HomePageState extends State<HomePage>
           const SizedBox(height: 40),
           // 最近打开列表
           _buildRecentSection(context, isNarrow),
-          const SizedBox(height: 24),
-          // 格式徽章墙（逐个弹入）
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            alignment: WrapAlignment.center,
-            children: [
-              for (var i = 0; i < _kBadges.length; i++)
-                _StaggeredBadge(
-                  label: _kBadges[i],
-                  delay: i * 60,
-                ),
-            ],
+          const SizedBox(height: 32),
+          // 格式徽章走马灯（双排反向滚动，悬停暂停）
+          SizedBox(
+            width: isNarrow ? 340 : 560,
+            child: BadgeMarquee(items: _kBadges, dark: isDark),
           ),
         ],
       ),
@@ -847,79 +866,14 @@ class _TabCloseButton extends StatelessWidget {
   }
 }
 
-/// 空状态徽章列表。
+/// 空状态徽章列表（走马灯用，更多格式）。
 const _kBadges = [
-  '.md', '.txt', '.diff', '.json', '.yaml', '.py',
+  '.md', '.txt', '.json', '.py', '.diff', '.yaml',
   '.go', '.rs', '.dart', '.ts', '.sql', '.sh',
+  '.html', '.css', '.js', '.java', '.kt', '.swift',
+  '.cpp', '.cs', '.rb', '.php', '.lua', '.csv',
+  '.xml', '.toml', '.log', '.proto', '.tex', '.ps1',
 ];
 
-/// 带弹入动画的格式徽章。
-class _StaggeredBadge extends StatefulWidget {
-  final String label;
-  final int delay;
-  const _StaggeredBadge({required this.label, required this.delay});
 
-  @override
-  State<_StaggeredBadge> createState() => _StaggeredBadgeState();
-}
-
-class _StaggeredBadgeState extends State<_StaggeredBadge>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _anim;
-
-  @override
-  void initState() {
-    super.initState();
-    _ctrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-    _anim = CurvedAnimation(parent: _ctrl, curve: Curves.easeOutBack);
-    Future.delayed(Duration(milliseconds: widget.delay), () {
-      if (mounted) _ctrl.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return FadeTransition(
-      opacity: _anim,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0, 0.4),
-          end: Offset.zero,
-        ).animate(_anim),
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.6, end: 1.0).animate(_anim),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: colorScheme.onSurface.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.5),
-              ),
-            ),
-            child: Text(
-              widget.label,
-              style: TextStyle(
-                fontSize: 12,
-                fontFamily: 'monospace',
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 

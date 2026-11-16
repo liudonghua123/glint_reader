@@ -145,6 +145,7 @@ class _ViewerPageState extends State<ViewerPage> {
       wordWrap: widget.wordWrap,
       style: CodeEditorStyle(
         fontSize: widget.fontSize,
+        fontHeight: widget.lineHeight,
         fontFamily: AppSettings.instance.font.family,
         codeTheme: codeTheme,
         backgroundColor: dark ? const Color(0xFF111418) : const Color(0xFFFFFFFF),
