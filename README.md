@@ -23,6 +23,7 @@ Supports 60+ file formats including **Markdown, Diff/Patch, JSON, YAML, code fil
 - **Markdown preview** — rendered view (headings, tables, code blocks) with source toggle
 - **Recent files** — home screen shows recently opened files, click to reopen
 - **Status bar** — file size, lines, characters, encoding; format-specific details (JSON validity, CSV rows/cols, diff +/- counts, headings/links/images for Markdown) expandable on click
+- **In-app updates** — checks GitHub Releases for new versions, in-app download with progress (desktop installs directly; Android opens the release page)
 - **Multi-tab** viewing — open several files at once
 - **Search within file** (Ctrl+F) with match navigation
 - **Line numbers** and code folding indicator

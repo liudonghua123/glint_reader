@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'i18n.dart';
 import 'settings.dart';
+import 'update_dialog.dart';
+import 'update_service.dart';
 
 /// 设置页面。
 class SettingsPage extends StatefulWidget {
@@ -258,6 +260,44 @@ class _SettingsPageState extends State<SettingsPage>
                           style: Theme.of(context).textTheme.titleSmall),
                       value: settings.wordWrap,
                       onChanged: (v) => settings.setWordWrap(v),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              // ── 关于 / 更新 ──
+              _sectionHeader(context, s['update.currentVersion']),
+              _card(
+                context,
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline,
+                            size: 18, color: colorScheme.primary),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Glint Reader v${UpdateService.instance.currentVersion ?? "?"}',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.tonalIcon(
+                        onPressed: () => showUpdateCheck(context),
+                        icon: const Icon(Icons.system_update_alt, size: 17),
+                        label: Text(s['update.check']),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
