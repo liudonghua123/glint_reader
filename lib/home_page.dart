@@ -472,9 +472,16 @@ class _HomePageState extends State<HomePage>
         itemBuilder: (context, i) {
           final file = _files[i];
           final active = i == _activeIndex;
+          // 标签只显示简单文件名（兼容 name 里误带路径的情况）
+          final displayName =
+              file.name.replaceAll('\\', '/').split('/').last;
           return Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: Material(
+            child: Tooltip(
+              // 悬停 / 长按显示完整路径
+              message: file.path,
+              waitDuration: const Duration(milliseconds: 400),
+              child: Material(
               color: active
                   ? colorScheme.primary.withValues(alpha: 0.12)
                   : Colors.transparent,
@@ -503,7 +510,7 @@ class _HomePageState extends State<HomePage>
                               : colorScheme.onSurfaceVariant),
                       const SizedBox(width: 6),
                       Text(
-                        file.name,
+                        displayName,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight:
@@ -520,6 +527,7 @@ class _HomePageState extends State<HomePage>
                 ),
               ),
             ),
+          ),
           );
         },
       ),

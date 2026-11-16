@@ -7,7 +7,8 @@ import 'package:re_highlight/re_highlight.dart';
 import 'settings.dart';
 
 /// Markdown 渲染视图：标题 / 列表 / 表格 / 代码块高亮 / 引用等。
-class MarkdownView extends StatelessWidget {
+/// 外层为可滚动容器（滚轮 + 滚动条）+ 页边距。
+class MarkdownView extends StatefulWidget {
   final String content;
   final bool themeIsDark;
   final double fontSize;
@@ -20,40 +21,73 @@ class MarkdownView extends StatelessWidget {
   });
 
   @override
+  State<MarkdownView> createState() => _MarkdownViewState();
+}
+
+class _MarkdownViewState extends State<MarkdownView> {
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final dark = themeIsDark;
+    final dark = widget.themeIsDark;
     final colorScheme = Theme.of(context).colorScheme;
 
+    // Scrollbar + SingleChildScrollView：垂直滚动、滚轮支持
+    return Scrollbar(
+      controller: _scroll,
+      thumbVisibility: true,
+      interactive: true,
+      child: SingleChildScrollView(
+        controller: _scroll,
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.sizeOf(context).height,
+          ),
+          child: _buildMarkdown(context, dark, colorScheme),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMarkdown(
+      BuildContext context, bool dark, ColorScheme colorScheme) {
     return MarkdownBody(
-      data: content,
+      data: widget.content,
       selectable: true,
       softLineBreak: true,
       extensionSet: null, // 使用默认 gitHubFlavored
       styleSheet: MarkdownStyleSheet(
         p: TextStyle(
-          fontSize: fontSize + 1,
+          fontSize: widget.fontSize + 1,
           height: 1.65,
           color: dark ? const Color(0xFFD7DDE4) : const Color(0xFF24292F),
         ),
         h1: TextStyle(
-          fontSize: fontSize + 10,
+          fontSize: widget.fontSize + 10,
           fontWeight: FontWeight.w800,
           height: 1.4,
           color: dark ? Colors.white : const Color(0xFF1A2129),
         ),
         h2: TextStyle(
-          fontSize: fontSize + 6,
+          fontSize: widget.fontSize + 6,
           fontWeight: FontWeight.w700,
           height: 1.4,
           color: dark ? Colors.white : const Color(0xFF1A2129),
         ),
         h3: TextStyle(
-          fontSize: fontSize + 3,
+          fontSize: widget.fontSize + 3,
           fontWeight: FontWeight.w700,
           color: dark ? Colors.white : const Color(0xFF1A2129),
         ),
         h4: TextStyle(
-          fontSize: fontSize + 1,
+          fontSize: widget.fontSize + 1,
           fontWeight: FontWeight.w700,
           color: dark ? Colors.white : const Color(0xFF1A2129),
         ),
@@ -67,7 +101,7 @@ class MarkdownView extends StatelessWidget {
           decoration: TextDecoration.underline,
         ),
         listBullet: TextStyle(
-          fontSize: fontSize + 1,
+          fontSize: widget.fontSize + 1,
           height: 1.6,
           color: dark ? const Color(0xFFD7DDE4) : const Color(0xFF24292F),
         ),
@@ -90,7 +124,7 @@ class MarkdownView extends StatelessWidget {
         ),
         codeblockPadding: const EdgeInsets.all(14),
         code: TextStyle(
-          fontSize: fontSize - 1,
+          fontSize: widget.fontSize - 1,
           fontFamily: AppSettings.instance.font.family,
           backgroundColor: dark
               ? Colors.white.withValues(alpha: 0.08)
@@ -99,11 +133,11 @@ class MarkdownView extends StatelessWidget {
         ),
         tableHead: TextStyle(
           fontWeight: FontWeight.w700,
-          fontSize: fontSize,
+          fontSize: widget.fontSize,
           color: dark ? Colors.white : const Color(0xFF1A2129),
         ),
         tableBody: TextStyle(
-          fontSize: fontSize,
+          fontSize: widget.fontSize,
           color: dark ? const Color(0xFFD7DDE4) : const Color(0xFF24292F),
         ),
         tableBorder: TableBorder.all(
@@ -124,7 +158,7 @@ class MarkdownView extends StatelessWidget {
       syntaxHighlighter: _GlintSyntaxHighlighter(
         dark: dark,
         fontFamily: AppSettings.instance.font.family,
-        fontSize: fontSize - 1,
+        fontSize: widget.fontSize - 1,
       ),
     );
   }
