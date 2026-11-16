@@ -36,6 +36,12 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // url_launcher_android 的源码在部分 lint 版本上触发 lintVital 崩溃
+    //（NoSuchMethodError JavaDocParser.parseDataItem），release 构建跳过 lint 检查。
+    lint {
+        checkReleaseBuilds = false
+    }
 }
 
 kotlin {
