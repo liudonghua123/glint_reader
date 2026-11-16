@@ -90,6 +90,12 @@ class FileKind {
   /// 是否为 Markdown（支持渲染预览）。
   bool get isMarkdown => id == 'markdown';
 
+  /// 是否为 HTML（支持渲染预览）。
+  bool get isHtml => id == 'html';
+
+  /// 是否支持渲染预览（Markdown / HTML）。
+  bool get isPreviewable => isMarkdown || isHtml;
+
   /// 是否支持语法高亮（re_highlight 内置该语言）。
   bool get isHighlightable => id != 'plaintext';
 

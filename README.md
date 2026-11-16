@@ -20,7 +20,7 @@ Supports 60+ file formats including **Markdown, Diff/Patch, JSON, YAML, code fil
 ## Features
 
 - **Syntax highlighting** for 60+ formats: Markdown, Diff, JSON, YAML, XML, HTML, CSS, JS/TS, Python, Go, Rust, C/C++, Java, Kotlin, Swift, Dart, Scala, Haskell, Elixir, Clojure, Julia, Shell, PowerShell, SQL, GraphQL, Protobuf, LaTeX and more (powered by [re_highlight](https://pub.dev/packages/re_highlight))
-- **Markdown preview** — rendered view (headings, tables, code blocks) with source toggle
+- **Markdown & HTML preview** — rendered view (headings, tables, code blocks / inline HTML) with source toggle
 - **Recent files** — home screen shows recently opened files, click to reopen
 - **Status bar** — file size, lines, characters, encoding; format-specific details (JSON validity, CSV rows/cols, diff +/- counts, headings/links/images for Markdown) expandable on click
 - **In-app updates** — checks GitHub Releases for new versions, in-app download with progress (desktop installs directly; Android opens the release page)

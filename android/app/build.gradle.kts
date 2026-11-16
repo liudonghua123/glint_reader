@@ -4,7 +4,36 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// ── Release 签名配置 ─────────────────────────────────────────────
+// 密码/别名优先从环境变量读取（CI），回退到本地 keystore.properties（不提交）。
+// CI（GitHub Actions）需提供：GLINT_KEYSTORE_BASE64（jks 的 base64）、
+// GLINT_KEYSTORE_PASSWORD、GLINT_KEY_ALIAS。
+import java.util.Properties
+
+val keystoreProperties = Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val ksStoreFile = System.getenv("GLINT_KEYSTORE_FILE")?.let { file(it) }
+    ?: file("../keystore/glint-reader-release.jks").takeIf { it.exists() }
+val ksStorePass = System.getenv("GLINT_KEYSTORE_PASSWORD")
+    ?: keystoreProperties.getProperty("storePassword")
+val ksKeyAlias = System.getenv("GLINT_KEY_ALIAS")
+    ?: keystoreProperties.getProperty("keyAlias")
+val ksKeyPass = System.getenv("GLINT_KEY_PASSWORD")
+    ?: keystoreProperties.getProperty("keyPassword")
+
 android {
+    signingConfigs {
+        if (ksStoreFile != null && ksStorePass != null && ksKeyAlias != null) {
+            create("release") {
+                storeFile = ksStoreFile
+                storePassword = ksStorePass
+                keyAlias = ksKeyAlias
+                keyPassword = ksKeyPass ?: ksStorePass
+            }
+        }
+    }
     namespace = "com.example.glint_reader"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -31,9 +60,10 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // 有 release 签名配置则使用（固定 keystore，保证跨次构建签名一致、
+            // 应用内更新可直接覆盖安装）；否则回退 debug 签名便于本地运行。
+            signingConfig = signingConfigs.findByName("release")
+                ?: signingConfigs.getByName("debug")
         }
     }
 

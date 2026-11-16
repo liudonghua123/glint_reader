@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:re_editor/re_editor.dart';
 
 import 'highlight_service.dart';
+import 'html_view.dart';
 import 'i18n.dart';
 import 'markdown_view.dart';
 import 'models.dart';
 import 'settings.dart';
 
 /// 查看器页面：只读（可切换）高亮文本视图。
-/// Markdown 文件支持源码 / 渲染预览切换。
+/// Markdown / HTML 文件支持源码 / 渲染预览切换。
 class ViewerPage extends StatefulWidget {
   final OpenFile file;
   final bool wordWrap;
@@ -63,8 +64,8 @@ class _ViewerPageState extends State<ViewerPage> {
     final dark = widget.themeIsDark;
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Markdown：源码 / 预览切换
-    if (widget.file.kind.isMarkdown) {
+    // Markdown / HTML：源码 / 预览切换
+    if (widget.file.kind.isPreviewable) {
       return Column(
         children: [
           // 切换条
@@ -114,11 +115,18 @@ class _ViewerPageState extends State<ViewerPage> {
           ),
           Expanded(
             child: _preview
-                ? MarkdownView(
-                    content: widget.file.content,
-                    themeIsDark: dark,
-                    fontSize: widget.fontSize,
-                  )
+                ? (widget.file.kind.isMarkdown
+                    ? MarkdownView(
+                        content: widget.file.content,
+                        themeIsDark: dark,
+                        fontSize: widget.fontSize,
+                      )
+                    : HtmlView(
+                        content: widget.file.content,
+                        themeIsDark: dark,
+                        fontSize: widget.fontSize,
+                        baseUrl: widget.file.path,
+                      ))
                 : _buildCodeEditor(dark, colorScheme),
           ),
         ],
