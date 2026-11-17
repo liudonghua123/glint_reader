@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import 'i18n.dart';
+import 'markdown_view.dart';
 import 'update_service.dart';
 
 /// 检查更新入口：在设置页或关于里调用。
@@ -208,10 +211,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ),
             ),
             const SizedBox(height: 12),
-            // Release notes（截断显示）
+            // Release notes：Markdown 渲染（截断滚动）
             if (widget.info.notes.isNotEmpty)
               Container(
-                constraints: const BoxConstraints(maxHeight: 180),
+                constraints: const BoxConstraints(maxHeight: 200),
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
@@ -219,13 +222,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: SingleChildScrollView(
-                  child: Text(
-                    widget.info.notes,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      height: 1.5,
-                      color: colorScheme.onSurface.withValues(alpha: 0.85),
-                    ),
+                  child: MarkdownView(
+                    content: _trimNotes(widget.info.notes),
+                    themeIsDark: isDark,
+                    fontSize: 12.5,
                   ),
                 ),
               ),
@@ -293,6 +293,28 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 _downloadPath ?? '',
                 style: const TextStyle(fontSize: 11.5, fontFamily: 'monospace'),
               ),
+              // 桌面端压缩包：提示解压替换（不可直接运行安装）
+              if (_isDesktopArchive) ...[
+                const SizedBox(height: 10),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 15, color: colorScheme.primary),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        s['update.desktopHint'],
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.45,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ],
         ),
@@ -318,14 +340,23 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ),
             ),
           ],
-          if (_phase == _UpdatePhase.done)
-            FilledButton(
-              onPressed: () {
-                UpdateService.openDownloadedFile(_downloadPath!);
-                Navigator.of(context).pop();
-              },
-              child: Text(s['update.install']),
-            ),
+          if (_phase == _UpdatePhase.done) ...[
+            if (_isDesktopArchive)
+              FilledButton.tonal(
+                onPressed: () {
+                  UpdateService.openDownloadedFile(_downloadPath!);
+                },
+                child: Text(s['update.openFolder']),
+              )
+            else
+              FilledButton(
+                onPressed: () {
+                  UpdateService.openDownloadedFile(_downloadPath!);
+                  Navigator.of(context).pop();
+                },
+                child: Text(s['update.install']),
+              ),
+          ],
           if (_phase == _UpdatePhase.error)
             FilledButton(
               onPressed: _startDownload,
@@ -349,7 +380,29 @@ class _UpdateDialogState extends State<UpdateDialog> {
     return s['update.resumed'].replaceAll('%s', pct);
   }
 
+  /// 精简 notes 用于对话框展示：
+  /// 去掉 Full Changelog 尾部与空段落，限制长度防卡顿。
+  String _trimNotes(String notes) {
+    var text = notes.trim();
+    final idx = text.indexOf('**Full Changelog**');
+    if (idx > 0) text = text.substring(0, idx).trim();
+    if (text.length > 4000) text = '${text.substring(0, 4000)}…';
+    return text;
+  }
+
   bool get _assetMissing => widget.info.assetUrl == widget.info.releasePageUrl;
+
+  /// 桌面端下载的是压缩包（不能直接运行安装）。
+  bool get _isDesktopArchive {
+    if (kIsWeb) return false;
+    try {
+      if (Platform.isAndroid || Platform.isIOS) return false;
+    } catch (_) {
+      return false;
+    }
+    final path = _downloadPath?.toLowerCase() ?? '';
+    return path.endsWith('.zip') || path.endsWith('.tar.gz');
+  }
 
   Future<void> _startDownload() async {
     setState(() {

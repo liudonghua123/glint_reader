@@ -362,8 +362,10 @@ class UpdateService {
 
   /// 打开下载的文件：
   /// - Android: 通过 FileProvider + ACTION_VIEW 调起系统安装器安装 APK
-  /// - Windows: 直接启动（便携版即运行）
-  /// - macOS/Linux: open / xdg-open
+  /// - Windows: 压缩包 → 资源管理器定位文件（便携 zip 无法直接运行，
+  ///   用 explorer /select, 打开所在目录并选中，提示用户解压替换）
+  /// - macOS: open（zip → Archive Utility 解压，app → Finder）
+  /// - Linux: xdg-open（文件管理器处理）
   static Future<void> openDownloadedFile(String path) async {
     if (kIsWeb) return;
     if (Platform.isAndroid) {
@@ -377,7 +379,21 @@ class UpdateService {
       return;
     }
     if (Platform.isWindows) {
-      await Process.start(path, [], mode: ProcessStartMode.detached);
+      final f = File(path);
+      if (!f.existsSync()) return;
+      final isArchive = path.toLowerCase().endsWith('.zip');
+      if (isArchive) {
+        // 资源管理器打开所在目录并选中压缩包；
+        // explorer 以 /select, 分隔参数（逗号后要空格）。
+        await Process.start(
+          'explorer.exe',
+          ['/select,', path],
+          mode: ProcessStartMode.detached,
+        );
+      } else {
+        // 可执行文件直接启动
+        await Process.start(path, [], mode: ProcessStartMode.detached);
+      }
     } else if (Platform.isMacOS) {
       await Process.run('open', [path]);
     } else if (Platform.isLinux) {
