@@ -62,12 +62,38 @@ class MainActivity : FlutterActivity() {
      * - 多数 ROM 上 GET_CONTENT 直达文件列表，而非 OPEN_DOCUMENT 的
      *   「最近 / 收藏」聚合首页
      * - EXTRA_INITIAL_URI 指向 Download，打开即文件列表（API 26+）
+     * - EXTRA_MIME_TYPES 限定应用支持的文本类格式
      * 选中后复制到应用缓存目录，返回可读路径。
      */
     private fun launchFilePicker() {
         val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
+            // 限定支持的文件格式后缀（MIME 过滤，匹配的才可选）
+            putExtra(
+                Intent.EXTRA_MIME_TYPES,
+                arrayOf(
+                    "text/*",
+                    "application/json",
+                    "application/xml",
+                    "application/yaml",
+                    "application/x-yaml",
+                    "application/toml",
+                    "application/javascript",
+                    "application/typescript",
+                    "application/x-sh",
+                    "application/x-python",
+                    "application/sql",
+                    "application/graphql",
+                    "application/x-protobuf",
+                    "application/xhtml+xml",
+                    "application/rss+xml",
+                    "text/csv",
+                    "application/vnd.ms-excel",
+                    "application/md",
+                    "application/octet-stream"
+                )
+            )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 // 落在 Download：用户直接看到文件列表
                 putExtra(
