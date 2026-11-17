@@ -232,14 +232,40 @@ class HomePage extends StatefulWidget {
     }
   }
 
-  /// Windows 剪贴板粘贴文件路径打开（Ctrl+V）。
+  /// Windows 剪贴板粘贴打开（Ctrl+V）：
+  /// 1) 优先读取 OS 层面复制的文件对象（CF_HDROP，
+  ///    资源管理器右键复制 / Ctrl+C）
+  /// 2) 兑底读纯文本路径（「复制为路径」或手工拷贝路径）
   Future<void> _pasteClipboardFile() async {
     if (kIsWeb || !Platform.isWindows) return;
+    // 1) 文件对象（可含多个文件）
+    try {
+      final paths = await _fileChannel
+          .invokeMethod<List<dynamic>>('getClipboardFiles');
+      if (paths != null && paths.isNotEmpty) {
+        var opened = 0;
+        for (final p in paths) {
+          final path = p.toString();
+          if (await _openLocalPath(path)) opened++;
+        }
+        if (opened > 0) return;
+      }
+    } on PlatformException {
+      // 通道不可用，兑底文本路径
+    }
+    // 2) 纯文本路径
     final text = await Clipboard.getData('text/plain')
         .then((v) => v?.text?.trim()) ?? '';
     // 剥离资源管理器「复制为路径」带的引号
     final path = text.replaceAll('"', '');
-    if (path.isEmpty || !File(path).existsSync()) return;
+    if (path.isEmpty) return;
+    await _openLocalPath(path);
+  }
+
+  /// 打开本地路径（文件）：校验支持格式，失败提示。
+  Future<bool> _openLocalPath(String path) async {
+    final f = File(path);
+    if (!f.existsSync()) return false;
     final name = path.replaceAll('\\', '/').split('/').last;
     if (!_isSupportedName(name)) {
       if (mounted) {
@@ -251,9 +277,10 @@ class HomePage extends StatefulWidget {
           ),
         );
       }
-      return;
+      return false;
     }
     await _loadPickedFile(name, path, null);
+    return true;
   }
 
   Future<void> _openFilePicker() async {
@@ -441,47 +468,91 @@ class HomePage extends StatefulWidget {
           ],
         ),
     );
-    // 拖拽悬停提示层
+    // 拖拽悬停提示层：毛玻璃遮罩 + 虚线框 + 弹入动画
     return Stack(
       children: [
         body,
         if (_dragging)
           Positioned.fill(
             child: IgnorePointer(
-              child: Container(
-                color: colorScheme.primary.withValues(alpha: 0.08),
-                alignment: Alignment.center,
+              child: AnimatedOpacity(
+                opacity: 1,
+                duration: const Duration(milliseconds: 120),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 24, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: colorScheme.primary,
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: colorScheme.primary.withValues(alpha: 0.25),
-                        blurRadius: 18,
+                  color: colorScheme.primary.withValues(alpha: 0.10),
+                  padding: const EdgeInsets.all(18),
+                  alignment: Alignment.center,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surface.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.85),
+                        width: 2,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.file_open_outlined,
-                          size: 20, color: colorScheme.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        LanguageService.instance.s['app.dropToOpen'],
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.primary,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.primary.withValues(alpha: 0.35),
+                          blurRadius: 32,
+                          spreadRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: DashedBorderContainer(
+                      color: colorScheme.primary.withValues(alpha: 0.7),
+                      radius: 18,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 36, vertical: 30),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    colorScheme.primary
+                                        .withValues(alpha: 0.18),
+                                    colorScheme.secondary
+                                        .withValues(alpha: 0.14),
+                                  ],
+                                ),
+                              ),
+                              child: Icon(Icons.file_open_rounded,
+                                  size: 30, color: colorScheme.primary),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              LanguageService
+                                  .instance.s['app.dropToOpen'],
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.primary,
+                                  ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              LanguageService
+                                  .instance.s['app.dropFormats'],
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -1129,6 +1200,89 @@ const _kBadges = [
   '.cpp', '.cs', '.rb', '.php', '.lua', '.csv',
   '.xml', '.toml', '.log', '.proto', '.tex', '.ps1',
 ];
+
+/// 虚线边框容器（拖拽提示用）。
+class DashedBorderContainer extends StatelessWidget {
+  final Widget child;
+  final Color color;
+  final double radius;
+  final double dashWidth;
+  final double dashGap;
+  final double strokeWidth;
+
+  const DashedBorderContainer({
+    super.key,
+    required this.child,
+    required this.color,
+    this.radius = 12,
+    this.dashWidth = 6,
+    this.dashGap = 4,
+    this.strokeWidth = 1.5,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      foregroundPainter: _DashedBorderPainter(
+        color: color,
+        radius: radius,
+        dashWidth: dashWidth,
+        dashGap: dashGap,
+        strokeWidth: strokeWidth,
+      ),
+      child: child,
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  final double dashWidth;
+  final double dashGap;
+  final double strokeWidth;
+
+  _DashedBorderPainter({
+    required this.color,
+    required this.radius,
+    required this.dashWidth,
+    required this.dashGap,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+    final dashed = Path();
+    for (final metric in path.computeMetrics()) {
+      var dist = 0.0;
+      while (dist < metric.length) {
+        final next = (dist + dashWidth).clamp(0.0, metric.length);
+        dashed.addPath(
+          metric.extractPath(dist, next),
+          Offset.zero,
+        );
+        dist = next + dashGap;
+      }
+    }
+    canvas.drawPath(dashed, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter old) =>
+      old.color != color ||
+      old.radius != radius ||
+      old.dashWidth != dashWidth ||
+      old.dashGap != dashGap;
+}
 
 
 
