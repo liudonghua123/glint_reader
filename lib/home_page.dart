@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 
 import 'badge_marquee.dart';
 import 'models.dart';
@@ -44,6 +45,10 @@ class HomePage extends StatefulWidget {
 
   // Android 返回手势：第一次提示，再按退出
   DateTime? _lastBackPress;
+
+  // 拖拽悬停高亮
+  bool _dragging = false;
+  bool get dragging => _dragging;
 
   // 空状态图标浮动动画
   late final AnimationController _float;
@@ -169,6 +174,88 @@ class HomePage extends StatefulWidget {
     'lua', 'pl', 'r', 'dockerfile',
   ];
 
+  /// 支持的扩展名集合（拖拽 / 粘贴快速校验用）。
+  static final Set<String> _supportedExtSet =
+      _supportedExtensions.toSet();
+
+  /// 根据扩展名判断文件类型是否受支持。
+  bool _isSupportedName(String name) {
+    final lower = name.toLowerCase();
+    final dot = lower.lastIndexOf('.');
+    if (dot < 0) {
+      // 无扩展名：常见无后缀配置文件仍支持
+      const noExt = ['dockerfile', 'makefile', 'nginx', 'license', 'readme'];
+      return noExt.contains(lower);
+    }
+    return _supportedExtSet.contains(lower.substring(dot + 1));
+  }
+
+  /// 拖拽文件进入（desktop_drop，支持 Windows/macOS/Linux/Android/Web）。
+  Future<void> _onDropFiles(DropDoneDetails details) async {
+    setState(() => _dragging = false);
+    for (final file in details.files) {
+      final name = file.name;
+      if (!_isSupportedName(name)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${LanguageService.instance.s['app.unsupported']}: $name',
+              ),
+            ),
+          );
+        }
+        continue;
+      }
+      String? content;
+      try {
+        if (!kIsWeb) {
+          content = await File(file.path).readAsString();
+        } else {
+          final bytes = await file.readAsBytes();
+          content = utf8.decode(bytes, allowMalformed: true);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '${LanguageService.instance.s['app.cannotRead']} $name: $e',
+              ),
+            ),
+          );
+        }
+        continue;
+      }
+      if (!mounted) return;
+      _openContent(name, content, path: kIsWeb ? name : file.path);
+    }
+  }
+
+  /// Windows 剪贴板粘贴文件路径打开（Ctrl+V）。
+  Future<void> _pasteClipboardFile() async {
+    if (kIsWeb || !Platform.isWindows) return;
+    final text = await Clipboard.getData('text/plain')
+        .then((v) => v?.text?.trim()) ?? '';
+    // 剥离资源管理器「复制为路径」带的引号
+    final path = text.replaceAll('"', '');
+    if (path.isEmpty || !File(path).existsSync()) return;
+    final name = path.replaceAll('\\', '/').split('/').last;
+    if (!_isSupportedName(name)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '${LanguageService.instance.s['app.unsupported']}: $name',
+            ),
+          ),
+        );
+      }
+      return;
+    }
+    await _loadPickedFile(name, path, null);
+  }
+
   Future<void> _openFilePicker() async {
     // Android：走原生 ACTION_GET_CONTENT 直达文件管理器浏览视图
     //（file_picker 的 OPEN_DOCUMENT 在部分 ROM 显示为「最近」聚合首页）。
@@ -280,13 +367,42 @@ class HomePage extends StatefulWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // 拖拽 + 粘贴支持：桌面与 Web 均启用（desktop_drop 支持
+    // Windows/macOS/Linux/Android/Web）；Ctrl+V 粘贴路径仅 Windows。
+    final dropEnabled = kIsWeb || isDesktop ||
+        (!kIsWeb && Platform.isAndroid);
+
     return PopScope<bool>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         _handleBackGesture();
       },
-      child: Scaffold(
+      child: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyV, control: true):
+              _pasteClipboardFile,
+          const SingleActivator(LogicalKeyboardKey.keyV, meta: true):
+              _pasteClipboardFile,
+        },
+        child: Focus(
+          autofocus: true,
+          child: dropEnabled
+              ? DropTarget(
+                  onDragEntered: (_) => setState(() => _dragging = true),
+                  onDragExited: (_) => setState(() => _dragging = false),
+                  onDragDone: _onDropFiles,
+                  child: _buildScaffold(context, isDark),
+                )
+              : _buildScaffold(context, isDark),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context, bool isDark) {
+    final colorScheme = Theme.of(context).colorScheme;
+    Widget body = Scaffold(
         // 不再用 SafeArea 顶部内边距：工具栏渐变延伸到状态栏后面，
         // 由 _buildToolbar 自行用 MediaQuery.padding.top 预留状态栏高度。
         body: Column(
@@ -324,7 +440,54 @@ class HomePage extends StatefulWidget {
               ),
           ],
         ),
-      ),
+    );
+    // 拖拽悬停提示层
+    return Stack(
+      children: [
+        body,
+        if (_dragging)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: Container(
+                color: colorScheme.primary.withValues(alpha: 0.08),
+                alignment: Alignment.center,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 24, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: colorScheme.primary,
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.primary.withValues(alpha: 0.25),
+                        blurRadius: 18,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.file_open_outlined,
+                          size: 20, color: colorScheme.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        LanguageService.instance.s['app.dropToOpen'],
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
