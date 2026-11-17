@@ -61,6 +61,7 @@ const _en = S({
   'app.homeTab': 'Home',
   'app.newTab': 'New tab',
   'app.dropToOpen': 'Drop to open file',
+  'app.dropFormats': 'Text, Markdown, JSON, code files and 40+ formats',
   'app.openHint': 'Open a text file to start reading',
   'app.openSub': 'Markdown · Diff · JSON · YAML · code files — 30+ formats with syntax highlighting',
   'app.settings': 'Settings',
@@ -128,6 +129,9 @@ const _en = S({
   'update.ready': 'Update Ready',
   'update.savedTo': 'Saved to:',
   'update.currentVersion': 'Current Version',
+  'update.desktopHint':
+      'Extract and replace the current app files to finish the update.',
+  'update.openFolder': 'Show in Folder',
 });
 
 const _zh = S({
@@ -138,6 +142,7 @@ const _zh = S({
   'app.homeTab': '主页',
   'app.newTab': '新建标签页',
   'app.dropToOpen': '释放以打开文件',
+  'app.dropFormats': '文本、Markdown、JSON、代码文件等 40+ 种格式',
   'app.openHint': '打开一个文本文件开始阅读',
   'app.openSub': 'Markdown · Diff · JSON · YAML · 代码文件等 30+ 格式语法高亮',
   'app.settings': '设置',
@@ -205,4 +210,6 @@ const _zh = S({
   'update.ready': '更新已就绪',
   'update.savedTo': '已保存至：',
   'update.currentVersion': '当前版本',
+  'update.desktopHint': '解压并替换当前应用文件即可完成更新。',
+  'update.openFolder': '在文件夹中显示',
 });
