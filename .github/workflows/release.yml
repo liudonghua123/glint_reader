@@ -27,6 +27,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 从 tag 提取版本号（v1.7.0 -> 1.7.0），用于产物命名
+      - name: Derive version
+        id: ver
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then TAG="dev"; fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -68,28 +77,38 @@ jobs:
         run: flutter build linux --release
         if: matrix.target == 'linux'
 
-      - name: Build APK
-        run: flutter build apk --release
+      # 三种 ABI 单独打包 + universal 混合包：
+      # --split-per-abi 产出 arm64-v8a / armeabi-v7a / x86_64 小体积 APK，
+      # 随后普通构建产出包含全部 ABI 的 universal APK。
+      - name: Build APKs (per-ABI + universal)
+        run: |
+          flutter build apk --release --split-per-abi
+          flutter build apk --release
         if: matrix.target == 'apk'
 
       - name: Zip Windows build
-        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath glint_reader-windows-x64.zip -Force
+        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "glint_reader-${{ steps.ver.outputs.version }}-windows-x64.zip" -Force
         if: matrix.target == 'windows'
 
       - name: Zip macOS app
         run: |
           cd build/macos/Build/Products/Release
-          zip -r -y "$GITHUB_WORKSPACE/glint_reader-macos.zip" glint_reader.app
+          zip -r -y "$GITHUB_WORKSPACE/glint_reader-${{ steps.ver.outputs.version }}-macos.zip" glint_reader.app
         if: matrix.target == 'macos'
 
       - name: Tar Linux build
         run: |
           cd build/linux/x64/release/bundle
-          tar czf "$GITHUB_WORKSPACE/glint_reader-linux-x64.tar.gz" .
+          tar czf "$GITHUB_WORKSPACE/glint_reader-${{ steps.ver.outputs.version }}-linux-x64.tar.gz" .
         if: matrix.target == 'linux'
 
-      - name: Rename APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk glint_reader-android.apk
+      - name: Collect APKs
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          cp build/app/outputs/flutter-apk/app-release.apk "glint_reader-$V-android-universal.apk"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "glint_reader-$V-android-arm64-v8a.apk"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "glint_reader-$V-android-armeabi-v7a.apk"
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk "glint_reader-$V-android-x86_64.apk"
         if: matrix.target == 'apk'
 
       - name: Upload artifacts
@@ -97,10 +116,10 @@ jobs:
         with:
           name: glint_reader-${{ matrix.target }}
           path: |
-            glint_reader-windows-x64.zip
-            glint_reader-macos.zip
-            glint_reader-linux-x64.tar.gz
-            glint_reader-android.apk
+            glint_reader-*-windows-x64.zip
+            glint_reader-*-macos.zip
+            glint_reader-*-linux-x64.tar.gz
+            glint_reader-*-android-*.apk
           if-no-files-found: error
 
   release:
@@ -118,8 +137,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/glint_reader-windows-x64.zip
-            dist/glint_reader-macos.zip
-            dist/glint_reader-linux-x64.tar.gz
-            dist/glint_reader-android.apk
+            dist/glint_reader-*-windows-x64.zip
+            dist/glint_reader-*-macos.zip
+            dist/glint_reader-*-linux-x64.tar.gz
+            dist/glint_reader-*-android-*.apk
           generate_release_notes: true
