@@ -11,11 +11,13 @@ import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// 平台对应的 release 资产文件名匹配。
+/// 资产命名格式：`glint_reader-<version>-<platform>.<ext>`
+/// 例如：`glint_reader-1.7.0-android-universal.apk`
 enum UpdateChannel {
-  windows('.zip', 'windows-x64.zip'),
-  macos('.zip', 'macos.zip'),
-  linux('.tar.gz', 'linux-x64.tar.gz'),
-  android('.apk', 'android.apk');
+  windows('.zip', 'windows-x64'),
+  macos('.zip', 'macos'),
+  linux('.tar.gz', 'linux-x64'),
+  android('.apk', 'android-universal');
 
   const UpdateChannel(this.suffix, this.assetMarker);
 
@@ -152,7 +154,8 @@ class UpdateService {
     final notes = data['body'] as String? ?? '';
     final pageUrl = data['html_url'] as String? ?? releasePage;
 
-    // 找到当前平台的资产
+    // 找到当前平台的资产：
+    // 名称格式 glint_reader-<version>-<marker><suffix>
     String? assetUrl;
     int assetSize = 0;
     final assets = (data['assets'] as List<dynamic>? ?? [])
@@ -161,31 +164,12 @@ class UpdateService {
       final name = (a['name'] as String? ?? '').toLowerCase();
       final url = a['browser_download_url'] as String? ?? '';
       final size = a['size'] as int? ?? 0;
-      if (name.endsWith(channel.suffix) &&
-          name.contains(channel.assetMarker.replaceAll(channel.suffix, ''))) {
+      if (name.startsWith('glint_reader-') &&
+          name.endsWith(channel.suffix) &&
+          name.contains(channel.assetMarker)) {
         assetUrl = url;
         assetSize = size;
         break;
-      }
-    }
-    // 兜底：按 marker 精确匹配
-    if (assetUrl == null) {
-      const markers = {
-        UpdateChannel.windows: 'windows-x64',
-        UpdateChannel.macos: 'macos',
-        UpdateChannel.linux: 'linux-x64',
-        UpdateChannel.android: 'android',
-      };
-      for (final a in assets) {
-        final name = (a['name'] as String? ?? '').toLowerCase();
-        final url = a['browser_download_url'] as String? ?? '';
-        final size = a['size'] as int? ?? 0;
-        if (name.endsWith(channel.suffix) &&
-            name.contains(markers[channel]!)) {
-          assetUrl = url;
-          assetSize = size;
-          break;
-        }
       }
     }
 
